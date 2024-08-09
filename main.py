@@ -199,10 +199,13 @@ with col1:
 
         list_document_copy = list(list_documents).copy()
 
-        text_total = f"<h5 style='text-align: left; color: black;'>{len(list(list_document_copy))} Documents:</h5>"
+        text_total = (
+            f"### :material/picture_as_pdf: {len(list(list_document_copy))} Documents:"
+        )
+
         st.markdown(
             text_total,
-            unsafe_allow_html=True,
+            unsafe_allow_html=False,
         )
 
         for document in list_document_copy:
@@ -291,6 +294,13 @@ with col3:
     reference_names_copy = list(set(reference_names.copy()))
 
     with container:
+
+        text_total = f"### :material/picture_as_pdf: Source Documents:"
+
+        st.markdown(
+            text_total,
+            unsafe_allow_html=False,
+        )
 
         for reference_name in reference_names_copy:
             document_path = f"/tmp/{reference_name}"
