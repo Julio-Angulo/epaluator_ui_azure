@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
+from azure.ai.ml import MLClient
 
 AZURE_ACCOUNT_NAME = st.secrets["storage_account_name"]
 AZURE_CONTAINER_NAME = st.secrets["container_name"]
@@ -13,6 +14,11 @@ AZURE_PRIMARY_KEY = st.secrets["storage_account_primary_key"]
 AZURE_CHAT_URL = st.secrets["chat_endpoint"]
 AZURE_API_KEY = st.secrets["chat_endpoint_api_key"]
 AZUREML_DEPLOYMENT = st.secrets["deployment_name"]
+SUBSCRIPTION_ID = st.secrets["subscription_id"]
+RESOURCE_GROUP = st.secrets["resource_group"]
+WORKSPACE_NAME = st.secrets["workspace_name"]
+CONFIG_PATH = st.secrets["config_path"]
+DATA_NAME = st.secrets["data_name"]
 
 reference_names = []
 reference_pages = []
@@ -71,6 +77,52 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
+def get_last_updated_index():
+    """
+    Retrieves the last updated index of a data asset from Azure Machine Learning.
+
+    Returns:
+        str: The last modified date of the data asset in the format "%d %b, %Y".
+    """
+    credential = DefaultAzureCredential()
+    # Check if given credential can get token successfully.
+    credential.get_token("https://management.azure.com/.default")
+
+    try:
+        ml_client = MLClient.from_config(credential=credential)
+    except Exception as ex:
+        # NOTE: Update following workspace information to contain
+        #       your subscription ID, resource group name, and workspace name
+        client_config = {
+            "subscription_id": SUBSCRIPTION_ID,
+            "resource_group": RESOURCE_GROUP,
+            "workspace_name": WORKSPACE_NAME,
+        }
+
+        # write and reload from config file
+        import json, os
+
+        config_path = CONFIG_PATH
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as fo:
+            fo.write(json.dumps(client_config))
+        ml_client = MLClient.from_config(credential=credential, path=config_path)
+
+    data_list = ml_client.data.list()
+    version = ""
+    for data in data_list:
+        if data.name == DATA_NAME:
+            version = data.latest_version
+
+    data_asset = ml_client.data.get(DATA_NAME, version=version)
+    data_asset_last_modified = data_asset.creation_context.last_modified_at
+    data_asset_last_modified_correct = data_asset_last_modified.astimezone().strftime(
+        "%d %b, %Y"
+    )
+
+    return data_asset_last_modified_correct
 
 
 def generate_download_signed_url(
@@ -190,7 +242,15 @@ col1, col2, col3 = st.columns([0.2, 0.6, 0.2])
 with col1:
     st.subheader(
         ":blue[MY KNOWLEDGE BASE INCLUDES THE FOLLOWING DOCUMENTS FROM EPA & OGMP. I UPDATE MY INFORMATION REGULARLY:]",
-        divider="gray",
+    )
+
+    last_updated_index = get_last_updated_index()
+
+    last_update = f"#### :material/update: Last Update: {last_updated_index}"
+
+    st.markdown(
+        last_update,
+        unsafe_allow_html=False,
     )
     container = st.container(border=True, height=800)
 
